@@ -68,7 +68,14 @@ const DocsList = ({ docs }) => {
 
   // Function to render markdown content with basic formatting
   const renderMarkdown = (content) => {
-    if (!content) return null;
+    // Add proper null/undefined checking
+    if (!content || typeof content !== "string") {
+      return (
+        <div className="text-gray-500 italic">
+          No documentation content available
+        </div>
+      );
+    }
 
     // Split content into lines for basic markdown rendering
     const lines = content.split("\n");
