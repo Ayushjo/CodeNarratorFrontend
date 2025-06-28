@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, FileArchive, Loader2, Sparkles } from "lucide-react";
+import { Upload, FileArchive, Loader2, Sparkles, Download } from "lucide-react";
 import toast from "react-hot-toast";
 import API from "../utils/api";
 
@@ -27,8 +27,20 @@ const FileUpload = ({ setDocs }) => {
     );
     const hasValidMimeType = validMimeTypes.includes(file.type);
 
-    // Accept if either MIME type is valid OR file extension is .zip
     return hasValidMimeType || hasValidExtension;
+  };
+
+  // Function to download documentation as markdown file
+  const downloadAsMarkdown = (documentation, filename) => {
+    const blob = new Blob([documentation], { type: "text/markdown" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${filename}_documentation.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   };
 
   const handleFileChange = (e) => {
@@ -80,35 +92,57 @@ const FileUpload = ({ setDocs }) => {
     formData.append("projectZip", file);
 
     try {
+      console.log("Starting upload...");
+
       const response = await API.post("/generate", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
-        timeout: 120000, // 2 minutes timeout
+        timeout: 180000, // 3 minutes timeout
       });
 
-      if (response.data) {
-        setDocs(response.data);
+      console.log("Response received:", response.status);
+      console.log("Processed files:", response.data.processedFiles);
+
+      if (response.data && response.data.documentation) {
+        // Set the documentation data for display
+        setDocs({
+          documentation: response.data.documentation,
+          files: response.data.files,
+          processedFiles: response.data.processedFiles,
+          successfulFiles: response.data.successfulFiles,
+        });
+
+        // Auto-download the documentation as markdown
+        downloadAsMarkdown(
+          response.data.documentation,
+          file.name.replace(".zip", "")
+        );
+
         toast.success(
-          `Successfully processed ${response.data.processedFiles} files!`,
+          `Successfully processed ${response.data.processedFiles} files! (${response.data.successfulFiles} successful)`,
           { id: loadingToast }
         );
+      } else {
+        throw new Error("No documentation data received");
       }
     } catch (error) {
       console.error("Upload error:", error);
+
       if (error.response) {
+        console.error("Error response:", error.response.data);
         toast.error(
           `Error: ${error.response.data.message || "Upload failed"}`,
-          {
-            id: loadingToast,
-          }
+          { id: loadingToast }
         );
       } else if (error.request) {
+        console.error("Network error:", error.request);
         toast.error("Network error. Please check if the backend is running.", {
           id: loadingToast,
         });
       } else {
-        toast.error("Unexpected error occurred", { id: loadingToast });
+        console.error("Unexpected error:", error.message);
+        toast.error(`Unexpected error: ${error.message}`, { id: loadingToast });
       }
     } finally {
       setLoading(false);
