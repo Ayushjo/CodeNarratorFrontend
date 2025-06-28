@@ -111,6 +111,8 @@ const FileUpload = ({ setDocs }) => {
           files: response.data.files,
           processedFiles: response.data.processedFiles,
           successfulFiles: response.data.successfulFiles,
+          markdownContent: response.data.documentation, // Store markdown content
+          projectName: file.name.replace(".zip", ""),
         });
 
         // Auto-download the documentation as markdown

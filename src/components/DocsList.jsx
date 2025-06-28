@@ -5,81 +5,211 @@ import {
   Download,
   CheckCircle,
   XCircle,
-  Loader2,
   BookOpen,
   Code,
   FileCode,
+  Eye,
+  EyeOff,
+  Copy,
+  Check,
 } from "lucide-react";
-import API from "../utils/api";
+import toast from "react-hot-toast";
 
-const DocsList = ({ docs, fileName }) => {
-  const [downloading, setDownloading] = useState(false);
+const DocsList = ({ docs }) => {
+  const [expandedDocs, setExpandedDocs] = useState(new Set());
+  const [copiedFiles, setCopiedFiles] = useState(new Set());
 
-  const handleDownloadPdf = async () => {
-    if (!fileName) {
-      alert("No documentation file available for download");
-      return;
-    }
+  // Function to download documentation as markdown file
+  const downloadAsMarkdown = (documentation, projectName) => {
+    const blob = new Blob([documentation], { type: "text/markdown" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${projectName}_documentation.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    toast.success("Documentation downloaded successfully!");
+  };
 
-    setDownloading(true);
-
+  // Function to copy individual file documentation
+  const copyFileDocumentation = async (fileDoc, fileName) => {
     try {
-      // Get the Supabase URL from your backend
-      const response = await API.get(`/download/${fileName}`, {
-        timeout: 30000,
-      });
+      await navigator.clipboard.writeText(fileDoc);
+      setCopiedFiles((prev) => new Set([...prev, fileName]));
+      toast.success(`${fileName} documentation copied to clipboard!`);
 
-      // Extract the PDF URL from the response
-      const pdfUrl = response.data.url;
-
-      if (!pdfUrl) {
-        throw new Error("No PDF URL received from server");
-      }
-
-      // For Supabase URLs, we can directly download or open
-      // Check if it's a Supabase URL
-      if (pdfUrl.includes("supabase.co")) {
-        // Option 1: Direct download
-        const link = document.createElement("a");
-        link.href = pdfUrl;
-        link.setAttribute("download", fileName.replace(".md", ".pdf"));
-        link.setAttribute("target", "_blank");
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      } else {
-        // Fallback for other URLs
-        window.open(pdfUrl, "_blank");
-      }
-
-      alert("✅ PDF download initiated successfully!");
+      // Reset copy status after 2 seconds
+      setTimeout(() => {
+        setCopiedFiles((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(fileName);
+          return newSet;
+        });
+      }, 2000);
     } catch (error) {
-      console.error("Download error:", error);
-      if (error.response) {
-        const errorMessage = error.response.data.message || "Unknown error";
-        alert(`Download failed: ${errorMessage}`);
-
-        // Log more details for debugging
-        console.error("Response data:", error.response.data);
-        console.error("Status:", error.response.status);
-      } else if (error.request) {
-        alert("Network error. Please check if the backend is running.");
-        console.error("Request error:", error.request);
-      } else {
-        alert(`Failed to download PDF: ${error.message}`);
-      }
-    } finally {
-      setDownloading(false);
+      toast.error("Failed to copy to clipboard");
     }
   };
 
-  if (!docs || docs.length === 0) {
+  // Function to toggle expanded view for individual files
+  const toggleExpanded = (fileName) => {
+    setExpandedDocs((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(fileName)) {
+        newSet.delete(fileName);
+      } else {
+        newSet.add(fileName);
+      }
+      return newSet;
+    });
+  };
+
+  // Function to render markdown content with basic formatting
+  const renderMarkdown = (content) => {
+    if (!content) return null;
+
+    // Split content into lines for basic markdown rendering
+    const lines = content.split("\n");
+    const elements = [];
+    let currentParagraph = [];
+
+    lines.forEach((line, index) => {
+      if (line.startsWith("# ")) {
+        if (currentParagraph.length > 0) {
+          elements.push(
+            <p
+              key={`p-${index}`}
+              className="mb-4 text-gray-700 leading-relaxed"
+            >
+              {currentParagraph.join(" ")}
+            </p>
+          );
+          currentParagraph = [];
+        }
+        elements.push(
+          <h1
+            key={index}
+            className="text-2xl font-bold text-gray-800 mb-4 border-b-2 border-gray-200 pb-2"
+          >
+            {line.substring(2)}
+          </h1>
+        );
+      } else if (line.startsWith("## ")) {
+        if (currentParagraph.length > 0) {
+          elements.push(
+            <p
+              key={`p-${index}`}
+              className="mb-4 text-gray-700 leading-relaxed"
+            >
+              {currentParagraph.join(" ")}
+            </p>
+          );
+          currentParagraph = [];
+        }
+        elements.push(
+          <h2
+            key={index}
+            className="text-xl font-semibold text-gray-800 mb-3 mt-6"
+          >
+            {line.substring(3)}
+          </h2>
+        );
+      } else if (line.startsWith("### ")) {
+        if (currentParagraph.length > 0) {
+          elements.push(
+            <p
+              key={`p-${index}`}
+              className="mb-4 text-gray-700 leading-relaxed"
+            >
+              {currentParagraph.join(" ")}
+            </p>
+          );
+          currentParagraph = [];
+        }
+        elements.push(
+          <h3
+            key={index}
+            className="text-lg font-medium text-gray-800 mb-2 mt-4"
+          >
+            {line.substring(4)}
+          </h3>
+        );
+      } else if (line.startsWith("```")) {
+        if (currentParagraph.length > 0) {
+          elements.push(
+            <p
+              key={`p-${index}`}
+              className="mb-4 text-gray-700 leading-relaxed"
+            >
+              {currentParagraph.join(" ")}
+            </p>
+          );
+          currentParagraph = [];
+        }
+        // Handle code blocks (basic implementation)
+        elements.push(
+          <div
+            key={index}
+            className="bg-gray-100 rounded-lg p-4 mb-4 font-mono text-sm overflow-x-auto"
+          >
+            <code className="text-gray-800">{line}</code>
+          </div>
+        );
+      } else if (line.startsWith("- ") || line.startsWith("* ")) {
+        if (currentParagraph.length > 0) {
+          elements.push(
+            <p
+              key={`p-${index}`}
+              className="mb-4 text-gray-700 leading-relaxed"
+            >
+              {currentParagraph.join(" ")}
+            </p>
+          );
+          currentParagraph = [];
+        }
+        elements.push(
+          <li key={index} className="ml-6 mb-2 text-gray-700">
+            {line.substring(2)}
+          </li>
+        );
+      } else if (line.trim() === "") {
+        if (currentParagraph.length > 0) {
+          elements.push(
+            <p
+              key={`p-${index}`}
+              className="mb-4 text-gray-700 leading-relaxed"
+            >
+              {currentParagraph.join(" ")}
+            </p>
+          );
+          currentParagraph = [];
+        }
+      } else if (line.trim() !== "") {
+        currentParagraph.push(line);
+      }
+    });
+
+    // Add any remaining paragraph
+    if (currentParagraph.length > 0) {
+      elements.push(
+        <p key="final-p" className="mb-4 text-gray-700 leading-relaxed">
+          {currentParagraph.join(" ")}
+        </p>
+      );
+    }
+
+    return elements;
+  };
+
+  if (!docs || !docs.files || docs.files.length === 0) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-4xl"
+        className="w-full max-w-6xl"
       >
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 p-12 text-center">
           <motion.div
@@ -108,14 +238,16 @@ const DocsList = ({ docs, fileName }) => {
     );
   }
 
-  const successfulDocs = docs.filter((doc) => doc.hasDocumentation).length;
+  const successfulDocs = docs.files.filter(
+    (doc) => doc.hasDocumentation
+  ).length;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
-      className="w-full max-w-4xl"
+      className="w-full max-w-6xl"
     >
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
         {/* Header */}
@@ -126,120 +258,126 @@ const DocsList = ({ docs, fileName }) => {
               Generated Documentation
             </h2>
             <p className="text-slate-200 text-sm mt-1">
-              {docs.length} file{docs.length !== 1 ? "s" : ""} processed
+              {docs.files.length} file{docs.files.length !== 1 ? "s" : ""}{" "}
+              processed
             </p>
           </div>
 
-          <AnimatePresence>
-            {fileName && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                onClick={handleDownloadPdf}
-                disabled={downloading}
-                className="bg-white/90 text-slate-700 px-4 py-2.5 rounded-lg font-medium hover:bg-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-md"
-                whileHover={{ scale: downloading ? 1 : 1.05 }}
-                whileTap={{ scale: downloading ? 1 : 0.95 }}
-              >
-                <AnimatePresence mode="wait">
-                  {downloading ? (
-                    <motion.div
-                      key="downloading"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="flex items-center"
-                    >
-                      <Loader2 className="animate-spin mr-2 h-4 w-4" />
-                      Generating PDF...
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="download"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="flex items-center"
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      Download PDF
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.button>
-            )}
-          </AnimatePresence>
+          <motion.button
+            onClick={() =>
+              downloadAsMarkdown(
+                docs.documentation,
+                docs.projectName || "project"
+              )
+            }
+            className="bg-white/90 text-slate-700 px-4 py-2.5 rounded-lg font-medium hover:bg-white transition-all duration-200 flex items-center shadow-md"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Download Markdown
+          </motion.button>
         </div>
 
         {/* Files List */}
-        <div className="divide-y divide-gray-100">
-          {docs.map((doc, index) => (
+        <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+          {docs.files.map((doc, index) => (
             <motion.div
               key={index}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
-              className="p-6 hover:bg-gray-50/50 transition-all duration-200"
-              whileHover={{ x: 4 }}
+              className="hover:bg-gray-50/50 transition-all duration-200"
             >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center mb-3">
-                    <motion.div
-                      className={`flex-shrink-0 w-3 h-3 rounded-full mr-3 ${
-                        doc.hasDocumentation ? "bg-emerald-400" : "bg-red-400"
-                      }`}
-                      animate={{
-                        scale: doc.hasDocumentation ? [1, 1.2, 1] : 1,
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat: doc.hasDocumentation
-                          ? Number.POSITIVE_INFINITY
-                          : 0,
-                        ease: "easeInOut",
-                      }}
-                    />
-                    <h3 className="text-lg font-medium text-gray-800 flex items-center gap-2">
-                      <FileCode className="h-4 w-4 text-gray-500" />
-                      {doc.file}
-                    </h3>
+              <div className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center mb-3">
+                      <motion.div
+                        className={`flex-shrink-0 w-3 h-3 rounded-full mr-3 ${
+                          doc.hasDocumentation ? "bg-emerald-400" : "bg-red-400"
+                        }`}
+                        animate={{
+                          scale: doc.hasDocumentation ? [1, 1.2, 1] : 1,
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: doc.hasDocumentation
+                            ? Number.POSITIVE_INFINITY
+                            : 0,
+                          ease: "easeInOut",
+                        }}
+                      />
+                      <h3 className="text-lg font-medium text-gray-800 flex items-center gap-2">
+                        <FileCode className="h-4 w-4 text-gray-500" />
+                        {doc.file}
+                      </h3>
+                    </div>
+
+                    <div className="flex items-center gap-3 mb-3">
+                      <span
+                        className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                          doc.hasDocumentation
+                            ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                            : "bg-red-100 text-red-700 border border-red-200"
+                        }`}
+                      >
+                        {doc.hasDocumentation ? (
+                          <>
+                            <CheckCircle className="mr-1.5 h-3 w-3" />
+                            Documentation Generated
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="mr-1.5 h-3 w-3" />
+                            Failed to Generate
+                          </>
+                        )}
+                      </span>
+
+                      {doc.hasDocumentation && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => toggleExpanded(doc.file)}
+                            className="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 text-xs font-medium border border-blue-200 hover:bg-blue-200 transition-colors"
+                          >
+                            {expandedDocs.has(doc.file) ? (
+                              <>
+                                <EyeOff className="mr-1 h-3 w-3" />
+                                Hide
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="mr-1 h-3 w-3" />
+                                View
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              copyFileDocumentation(doc.summary, doc.file)
+                            }
+                            className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 text-xs font-medium border border-gray-200 hover:bg-gray-200 transition-colors"
+                          >
+                            {copiedFiles.has(doc.file) ? (
+                              <>
+                                <Check className="mr-1 h-3 w-3" />
+                                Copied
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="mr-1 h-3 w-3" />
+                                Copy
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <motion.div
-                    className="mt-2"
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                  >
-                    <span
-                      className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                        doc.hasDocumentation
-                          ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                          : "bg-red-100 text-red-700 border border-red-200"
-                      }`}
-                    >
-                      {doc.hasDocumentation ? (
-                        <>
-                          <CheckCircle className="mr-1.5 h-3 w-3" />
-                          Documentation Generated
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="mr-1.5 h-3 w-3" />
-                          Failed to Generate
-                        </>
-                      )}
-                    </span>
-                  </motion.div>
-                </div>
-
-                <div className="ml-4 flex-shrink-0">
-                  <motion.div
-                    className="text-sm text-gray-500"
-                    whileHover={{ scale: 1.05 }}
-                  >
+                  <div className="ml-4 flex-shrink-0">
                     {doc.file.endsWith(".js") ? (
                       <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-yellow-100 text-yellow-700 text-xs font-medium border border-yellow-200">
                         <Code className="mr-1 h-3 w-3" />
@@ -256,8 +394,25 @@ const DocsList = ({ docs, fileName }) => {
                         Unknown
                       </span>
                     )}
-                  </motion.div>
+                  </div>
                 </div>
+
+                {/* Expanded Documentation View */}
+                <AnimatePresence>
+                  {expandedDocs.has(doc.file) && doc.hasDocumentation && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="mt-4 bg-gray-50/50 rounded-lg p-6 border border-gray-200"
+                    >
+                      <div className="prose prose-sm max-w-none">
+                        {renderMarkdown(doc.summary)}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </motion.div>
           ))}
@@ -276,17 +431,38 @@ const DocsList = ({ docs, fileName }) => {
               <span className="font-medium text-emerald-600">
                 {successfulDocs}
               </span>
-              <span>of {docs.length} files successfully documented</span>
+              <span>of {docs.files.length} files successfully documented</span>
             </div>
 
-            {fileName && (
-              <div className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                Documentation file: {fileName}
-              </div>
-            )}
+            <div className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+              Project: {docs.projectName || "Unknown"}
+            </div>
           </div>
         </motion.div>
       </div>
+
+      {/* Full Documentation View */}
+      {docs.documentation && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="mt-8 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
+        >
+          <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Complete Documentation
+            </h3>
+          </div>
+
+          <div className="p-6 max-h-96 overflow-y-auto">
+            <div className="prose prose-sm max-w-none">
+              {renderMarkdown(docs.documentation)}
+            </div>
+          </div>
+        </motion.div>
+      )}
     </motion.div>
   );
 };
