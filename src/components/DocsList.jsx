@@ -49,7 +49,7 @@ const DocsList = ({ docs }) => {
       className="w-full max-w-4xl"
     >
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-        {/* Header */}
+        
         <div className="bg-slate-700 px-6 py-6 flex justify-between items-center">
           <div>
             <h2 className="text-xl font-semibold text-white flex items-center gap-3">
@@ -71,7 +71,7 @@ const DocsList = ({ docs }) => {
           </button>
         </div>
 
-        {/* Files List */}
+        
         <div className="divide-y divide-gray-100">
           {docs.files.map((doc, index) => (
             <div key={index} className="p-6">
@@ -131,7 +131,6 @@ const DocsList = ({ docs }) => {
           ))}
         </div>
 
-        {/* Footer */}
         <div className="bg-gray-50 px-6 py-4">
           <div className="flex items-center justify-between text-sm text-gray-600">
             <span>
@@ -145,7 +144,6 @@ const DocsList = ({ docs }) => {
         </div>
       </div>
 
-      {/* Documentation Preview */}
       {docs.documentation && (
         <div className="mt-8 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
           <div className="bg-indigo-600 px-6 py-4">
